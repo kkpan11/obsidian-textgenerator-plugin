@@ -5,6 +5,7 @@ import ContextManager from "../scope/context-manager";
 import debug from "debug";
 import { transformStringsToChatFormat } from ".";
 import { LLMConfig } from "../LLMProviders/interface";
+import { AI_MODELS } from "#/constants";
 const logger = debug("textgenerator:ReqFormatter");
 export default class ReqFormatter {
   plugin: TextGeneratorPlugin;
@@ -35,8 +36,8 @@ export default class ReqFormatter {
     };
   }
 
-  getRequestParameters(
-    _params: Partial<TextGeneratorSettings & {prompt: Message["content"]}>,
+  async getRequestParameters(
+    _params: Partial<TextGeneratorSettings & { prompt: string }>,
     insertMetadata: boolean,
     templatePath = "",
     additionnalParams: {
@@ -44,25 +45,36 @@ export default class ReqFormatter {
       bodyParams?: any;
     } = {}
   ) {
-
-    console.log({
-      _params,
-      insertMetadata,
-      templatePath,
-      additionnalParams
-    })
     logger("prepareReqParameters", _params, insertMetadata, templatePath);
     const frontmatter: any = this.getFrontmatter(templatePath, insertMetadata);
 
     const params = {
       ...this.plugin.settings,
+      ...this.plugin.defaultSettings.LLMProviderOptions[
+      frontmatter?.config?.provider ||
+      (this.plugin.settings.selectedProvider as any)],
       ...this.plugin.settings.LLMProviderOptions[
-        frontmatter?.config?.provider ||
-          (this.plugin.settings.selectedProvider as any)
+      frontmatter?.config?.provider ||
+      (this.plugin.settings.selectedProvider as any)
       ],
       ...this.getFrontmatter(templatePath, insertMetadata),
       ..._params,
     };
+
+
+    if (
+      !this.plugin.textGenerator.LLMProvider ||
+      frontmatter.config?.provider !== this.plugin.textGenerator.LLMProvider.id
+    )
+      // load the provider
+      await this.plugin.textGenerator.loadllm(frontmatter.config?.provider);
+
+    if (!this.plugin.textGenerator.LLMProvider) throw "LLM Provider not intialized";
+
+    params.model = params.model?.toLowerCase();
+
+    if (params.includeAttachmentsInRequest ?? params.advancedOptions?.includeAttachmentsInRequest)
+      params.prompt = await this.plugin.contextManager.splitContent(params.prompt, params.noteFile, (AI_MODELS[params.model] || AI_MODELS["models/" + params.model])?.inputOptions || {})
 
     let bodyParams: Partial<LLMConfig & { prompt: string }> & {
       messages: Message[];
@@ -78,16 +90,12 @@ export default class ReqFormatter {
 
     if (
       !params.messages?.length &&
-     (typeof  params.prompt == "object"||  
-      params.prompt?.replaceAll?.("\n", "").trim().length)
+      (typeof params.prompt == "object" ||
+        params.prompt?.replaceAll?.("\n", "").trim().length)
     ) {
-      bodyParams.messages.push({ role: "user", content: params.prompt || "" });
+      bodyParams.messages.push(this.plugin.textGenerator.LLMProvider.makeMessage(params.prompt || "", "user"));
     }
 
-    const provider: {
-      selectedProvider?: string;
-      providerOptions?: any;
-    } = {};
 
     let reqParams: RequestInit & {
       // url: string,
@@ -110,6 +118,12 @@ export default class ReqFormatter {
     //   };
     // }
 
+    const provider: {
+      selectedProvider?: string;
+      providerOptions?: any;
+    } = {};
+
+
     // on insertMetadata
     if (frontmatter) {
       // -- provider options
@@ -128,10 +142,7 @@ export default class ReqFormatter {
         }
 
         if (params.system || params.config?.system) {
-          bodyParams.messages.unshift({
-            role: "system",
-            content: params.system || params.config.system,
-          });
+          bodyParams.messages.unshift(this.plugin.textGenerator.LLMProvider.makeMessage(params.system || params.config.system, "system"));
         }
       }
 

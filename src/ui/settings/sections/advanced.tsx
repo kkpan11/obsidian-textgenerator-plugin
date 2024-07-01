@@ -3,8 +3,8 @@ import useGlobal from "../../context/global";
 import SettingItem from "../components/item";
 import SettingsSection from "../components/section";
 import Input from "../components/input";
+import Confirm from "#/ui/components/confirm";
 import type { Register } from ".";
-import Confirm from "#/ui/package-manager/components/confirm";
 export default function AdvancedSetting(props: { register: Register }) {
   const global = useGlobal();
 
@@ -135,8 +135,8 @@ export default function AdvancedSetting(props: { register: Register }) {
         />
       </SettingItem>
 
-      {!!global.plugin.settings.experiment && <SettingItem
-        name="include Attachments InRequest"
+      <SettingItem
+        name="include Attachments"
         description="EXPERIMENTAL: adds the images that are referenced in the request, IT MIGHT CONSUME ALOT OF TOKENS"
         register={props.register}
         sectionId={sectionId}
@@ -152,7 +152,7 @@ export default function AdvancedSetting(props: { register: Register }) {
             global.triggerReload();
           }}
         />
-      </SettingItem>}
+      </SettingItem>
 
 
       <SettingItem

@@ -2,7 +2,7 @@
 // import { App, Notice, Editor, RequestUrlParam, EditorPosition } from "obsidian";
 import TextGeneratorPlugin from "../main";
 import ReqFormatter from "../utils/api-request-formatter";
-import ContextManager, { InputContext } from "../scope/context-manager";
+import type { InputContext } from "../scope/context-manager";
 import debug from "debug";
 import { Message, TextGeneratorSettings } from "../types";
 import { Handlebars } from "../helpers/handlebars-helpers";
@@ -145,20 +145,16 @@ export default class RequestHandler {
       settings,
     });
 
-    let promp: Message["content"]  = await Handlebars.compile(
+    let promp: Message["content"] = await Handlebars.compile(
       this.plugin.contextManager.overProcessTemplate(prompt)
     )({
       ...settings,
       templatePath: "default/default",
     });
 
-
-    if (settings.advancedOptions?.includeAttachmentsInRequest ?? this.plugin.settings.advancedOptions?.includeAttachmentsInRequest)
-      promp = await this.plugin.contextManager.splitContent(prompt)
-
     try {
       const { reqParams, bodyParams, provider, allParams } =
-        this.reqFormatter.getRequestParameters(
+        await this.reqFormatter.getRequestParameters(
           {
             ...this.LLMProvider.getSettings(),
             ...settings,
@@ -167,12 +163,6 @@ export default class RequestHandler {
           },
           false
         );
-
-      if (
-        !this.LLMProvider ||
-        provider.selectedProvider !== this.LLMProvider.id
-      )
-        await this.loadllm(provider.selectedProvider);
 
       await providerOptionsValidator(
         this.LLMProvider.provider,
@@ -246,16 +236,14 @@ export default class RequestHandler {
       }
 
       const { options, template } = context;
-      
-      let prompt: Message["content"] = (typeof template != "undefined" && !context.context
+
+      const prompt = (typeof template != "undefined" && !context.context
         ? template.inputTemplate(options)
         : context.context) as string;
 
-        if (this.plugin.settings.advancedOptions?.includeAttachmentsInRequest)
-        prompt = await this.plugin.contextManager.splitContent(prompt, context.options?.noteFile)
 
       const { reqParams, bodyParams, provider, allParams } =
-        this.reqFormatter.getRequestParameters(
+        await this.reqFormatter.getRequestParameters(
           {
             ...context.options,
             ...params,
@@ -265,12 +253,6 @@ export default class RequestHandler {
           templatePath,
           additionnalParams
         );
-
-      if (
-        !this.LLMProvider ||
-        provider.selectedProvider !== this.LLMProvider.id
-      )
-        await this.loadllm(provider.selectedProvider);
 
       await providerOptionsValidator(
         this.LLMProvider.provider,
@@ -470,16 +452,12 @@ export default class RequestHandler {
         return Promise.reject(new Error("There is another generation process"));
       }
 
-      let prompt: Message["content"] | undefined = (typeof template != "undefined" && !context.context?.trim()
+      const prompt = (typeof template != "undefined" && !context.context?.trim()
         ? await template.inputTemplate(options)
         : context.context) as string;
 
-        if (this.plugin.settings.advancedOptions?.includeAttachmentsInRequest)
-        prompt = await this.plugin.contextManager.splitContent(prompt)
-
-      console.log({ prompt })
       const { reqParams, bodyParams, provider, allParams } =
-        this.reqFormatter.getRequestParameters(
+        await this.reqFormatter.getRequestParameters(
           {
             ...context.options,
             ...params,
@@ -488,12 +466,6 @@ export default class RequestHandler {
           insertMetadata,
           templatePath
         );
-
-      if (
-        !this.LLMProvider ||
-        provider.selectedProvider !== this.LLMProvider.id
-      )
-        await this.loadllm(provider.selectedProvider);
 
       await providerOptionsValidator(
         this.LLMProvider.provider,

@@ -6,15 +6,23 @@ import LLMProviderInterface, { LLMConfig } from "../interface";
 import { IconExternalLink } from "@tabler/icons-react";
 import { BaseLanguageModelParams } from "@langchain/core/language_models/base";
 
-import { Input, SettingItem, useGlobal } from "../refs";
+import { Input, Message, SettingItem, useGlobal } from "../refs";
 import type { AnthropicInput } from "@langchain/anthropic";
+import { ModelsHandler } from "../utils";
 
 const logger = debug("textgenerator:llmProvider:chatanthropic");
 
+
+const default_values = {
+  basePath: "https://api.anthropic.com/",
+  model: "claude-3-5-sonnet-20240620",
+};
+
+
+
 export default class LangchainChatAnthropicProvider
   extends LangchainBase
-  implements LLMProviderInterface
-{
+  implements LLMProviderInterface {
   static provider = "Langchain";
   static id = "Chat Anthropic (Langchain)" as const;
   static slug = "anthropic" as const;
@@ -26,9 +34,7 @@ export default class LangchainChatAnthropicProvider
   id = LangchainChatAnthropicProvider.id;
   originalId = LangchainChatAnthropicProvider.id;
 
-  default_values = {
-    basePath: "https://api.anthropic.com/",
-  };
+  default_values = default_values;
 
   getConfig(
     options: LLMConfig
@@ -68,9 +74,7 @@ export default class LangchainChatAnthropicProvider
 
     const id = props.self.id;
 
-    const config = (global.plugin.settings.LLMProviderOptions[id] ??= {
-      model: "claude-2",
-    });
+    const config = (global.plugin.settings.LLMProviderOptions[id] ??= { ...props.self.default_values });
 
     return (
       <>
@@ -108,22 +112,12 @@ export default class LangchainChatAnthropicProvider
             }}
           />
         </SettingItem>
-        <SettingItem
-          name="model"
+        <ModelsHandler
           register={props.register}
           sectionId={props.sectionId}
-        >
-          <Input
-            value={config.model}
-            placeholder="Enter your Model name"
-            setValue={async (value) => {
-              config.model = value;
-              global.triggerReload();
-              // TODO: it could use a debounce here
-              await global.plugin.saveSettings();
-            }}
-          />
-        </SettingItem>
+          llmProviderId={props.self.originalId || id}
+          default_values={default_values}
+        />
         <div className="plug-tg-flex plug-tg-flex-col plug-tg-gap-2">
           <div className="plug-tg-text-lg plug-tg-opacity-70">Useful links</div>
           <a href="https://docs.anthropic.com/claude/reference/getting-started-with-the-api">
@@ -149,5 +143,13 @@ export default class LangchainChatAnthropicProvider
         </div>
       </>
     );
+  }
+
+
+  makeMessage(content: any, role: "system" | "user" | "assistant"): Message {
+    return {
+      role: role === "user" ? "human" : role,
+      content
+    };
   }
 }

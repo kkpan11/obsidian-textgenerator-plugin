@@ -38,7 +38,7 @@ try {
   console.log(` - manifest-beta.json`);
   if (!isBeta) {
     console.log(` - manifest.json`);
-    console.log(` - versions.json`);
+    // console.log(` - versions.json`);
   }
   console.log(`It will commit, push, create tag ${targetVersion} and push tags`);
 
@@ -59,26 +59,29 @@ try {
       manifest.version = targetVersion;
       writeFileSync("manifest.json", JSON.stringify(manifest, null, "\t"));
       console.log("writing manifest.json");
+      try {
+        // update versions.json with target version and minAppVersion from manifest
+        let versions = JSON.parse(readFileSync("versions.json", "utf8"));
+        versions[targetVersion] = manifest.minAppVersion;
 
-      // update versions.json with target version and minAppVersion from manifest
-      let versions = JSON.parse(readFileSync("versions.json", "utf8"));
-      versions[targetVersion] = manifest.minAppVersion;
-      writeFileSync("versions.json", JSON.stringify(versions, null, "\t"));
-      console.log("writing versions.json");
+        writeFileSync("versions.json", JSON.stringify(versions, null, "\t"));
+
+        console.log("writing versions.json");
+      } catch { }
     }
 
     // commit, create tag and push to origin (that will trigger github release action)
-    try {
-      execSync(
-        `git add manifest.json manifest-beta.json versions.json && git commit -m "prepare release ${targetVersion}"`, // && git push origin ${targetVersion}`,
-        {
-          cwd: ".",
-          stdio: "inherit",
-        }
-      );
-    } catch {
-      // even if this fails, it doesn't matter.
-    }
+    // try {
+    execSync(
+      `git add manifest.json manifest-beta.json && git commit -m "prepare release ${targetVersion}"`, // && git push origin ${targetVersion}`,
+      {
+        cwd: ".",
+        stdio: "inherit",
+      }
+    );
+    // } catch {
+    //   // even if this fails, it doesn't matter.
+    // }
 
     execSync(
       `git push`,
